@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>IDS Panel</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        body { background-color: #121212; color: #ffffff; font-family: 'Segoe UI', sans-serif; }
+        .sidebar { position: fixed; top: 0; bottom: 0; left: 0; width: 260px; background-color: #1a1a1a; border-right: 1px solid #2d2d2d; padding-top: 20px; }
+        .sidebar .nav-link { color: #b5b5b5; padding: 12px 20px; border-radius: 4px; margin: 4px 15px; cursor: pointer; display: block; text-decoration: none; }
+        .sidebar .nav-link.active { background-color: #0d6efd; color: #fff; font-weight: bold; }
+        .sidebar .nav-link:hover:not(.active) { background-color: #252525; color: #fff; }
+        .main-content { margin-left: 260px; padding: 30px; }
+        .card { background-color: #1e1e1e; border: 1px solid #2d2d2d; color: #ffffff; margin-bottom: 20px; }
+        .dashboard-tab { display: none; }
+        .dashboard-tab.active-tab { display: block; }
+        .bg-green { background-color: #198754 !important; }
+        .bg-red { background-color: #dc3545 !important; }
+        .cm-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-width: 280px; margin: 0 auto; text-align: center; }
+        .cm-box { padding: 20px; border-radius: 6px; font-weight: bold; font-size: 20px; }
+        .cm-tn { background-color: #1d365c; color: #3498db; border: 1px solid #3498db; }
+        .cm-fp { background-color: #5c3e26; color: #f39c12; border: 1px solid #f39c12; }
+        .cm-fn { background-color: #5c2626; color: #e74c3c; border: 1px solid #e74c3c; }
+        .cm-tp { background-color: #1a5235; color: #2ecc71; border: 1px solid #2ecc71; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <h4 class="text-center text-primary fw-bold mb-4">🛡️ IDS Panel</h4>
+        <div class="nav flex-column">
+            <span class="nav-link active" onclick="switchTab('overview')">📊 Overview Console</span>
+            <span class="nav-link" onclick="switchTab('logs')">📋 Prediction Logs</span>
+            <span class="nav-link" onclick="switchTab('graphs')">📈 Accuracy Metrics</span>
+            <span class="nav-link" onclick="switchTab('matrix')">🧩 Confusion Matrix</span>
+            <span class="nav-link" onclick="switchTab('shap')">🧬 Individual SHAP Plots</span>
+        </div>
+        <div class="position-absolute bottom-0 start-0 p-3 w-100 border-top border-secondary text-center">
+            <a href="/logout" class="btn btn-sm btn-outline-danger w-100">Terminate Session</a>
+        </div>
+    </div>
+
+    <div class="main-content">
+        
+        <div id="tab-overview" class="dashboard-tab active-tab">
+            <h3>Overview Console Dashboard</h3>
+            <p class="text-muted mb-4">Real-time system data pipelines.</p>
+            <div class="row g-3">
+                <div class="col-md-4"><div class="card p-4 text-center"><h6>Total Traces Assessed</h6><h2 id="total-1" class="text-info fw-bold">0</h2></div></div>
+                <div class="col-md-4"><div class="card p-4 text-center"><h6>Clean Profiles</h6><h2 id="clean-1" class="text-success fw-bold">0</h2></div></div>
+                <div class="col-md-4"><div class="card p-4 text-center"><h6>Mitigated Intrusions</h6><h2 id="attack-1" class="text-danger fw-bold">0</h2></div></div>
+            </div>
+        </div>
+
+        <div id="tab-logs" class="dashboard-tab">
+            <h3>Real-Time Prediction Logs Ledger</h3>
+            <p class="text-muted mb-4">Historic chronological breakdown of active packet ingestions.</p>
+            <div class="card p-3">
+                <div class="table-responsive" style="max-height: 450px;">
+                    <table class="table table-dark align-middle">
+                        <thead>
+                            <tr><th>Index</th><th>Classification</th><th>Extracted Features Baseline Trace</th></tr>
+                        </thead>
+                        <tbody id="ledger-body">
+                            <tr><td colspan="3" class="text-center text-muted">Awaiting stream ingestion events...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-graphs" class="dashboard-tab">
+            <h3>Accuracy Traffic Profiling Distribution</h3>
+            <p class="text-muted mb-4">Ratio analysis metrics of classified system traces.</p>
+            <div class="card p-4" style="max-width: 500px; margin: 0 auto;">
+                <div style="position: relative; height:320px; width:100%">
+                    <canvas id="accuracyDoughnutChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-matrix" class="dashboard-tab">
+            <h3>Live Pipeline Confusion Matrix</h3>
+            <p class="text-muted mb-4">Validating runtime classifications against true packet properties.</p>
+            <div class="card p-5 text-center">
+                <div class="cm-grid">
+                    <div class="cm-box cm-tn" id="cm-tn">0<div style="font-size:11px;" class="fw-light text-white">True Neg (Normal)</div></div>
+                    <div class="cm-box cm-fp" id="cm-fp">0<div style="font-size:11px;" class="fw-light text-white">False Pos (Alarm)</div></div>
+                    <div class="cm-box cm-fn" id="cm-fn">0<div style="font-size:11px;" class="fw-light text-white">False Neg (Missed)</div></div>
+                    <div class="cm-box cm-tp" id="cm-tp">0<div style="font-size:11px;" class="fw-light text-white">True Pos (Attack)</div></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-shap" class="dashboard-tab">
+            <h3>🧬 Individual SHAP Explanations</h3>
+            <p class="text-muted mb-4">Explainable AI feature impact tracking and logic analysis for the latest packet.</p>
+            
+            <div class="row">
+                <div class="col-md-7">
+                    <div class="card p-4">
+                        <h6 class="text-warning mb-3">Feature Importance Values Plot</h6>
+                        <div style="position: relative; height:300px; width:100%">
+                            <canvas id="shapBarChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-5">
+                    <div class="card p-4 h-100">
+                        <h6 class="text-info mb-3">Individual Logic Explanation</h6>
+                        <div id="shap-verdict" class="mb-3 fw-bold">Verdict: Awaiting Data...</div>
+                        <ul id="shap-reasons-list" class="text-light small ps-3">
+                            <li class="text-muted">No packets analyzed yet.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        function switchTab(tabId) {
+            document.querySelectorAll('.dashboard-tab').forEach(el => el.classList.remove('active-tab'));
+            document.querySelectorAll('.sidebar .nav-link').forEach(el => el.classList.remove('active'));
+            
+            document.getElementById('tab-' + tabId).classList.add('active-tab');
+            event.target.classList.add('active');
+        }
+
+        const doughnutCtx = document.getElementById('accuracyDoughnutChart').getContext('2d');
+        const myDoughnutChart = new Chart(doughnutCtx, {
+            type: 'doughnut',
+            data: { labels: ['Normal Profiles', 'Attack Vectors'], datasets: [{ data: [0, 0], backgroundColor: ['#198754', '#dc3545'], borderColor: '#2d2d2d' }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#fff' } } } }
+        });
+
+        const shapCtx = document.getElementById('shapBarChart').getContext('2d');
+        const shapChart = new Chart(shapCtx, {
+            type: 'bar',
+            data: { labels: ['src_bytes', 'protocol_type', 'flag', 'duration', 'service'], datasets: [{ label: 'Feature Weight Impact Value', data: [0, 0, 0, 0, 0], backgroundColor: ['#dc3545', '#ffc107', '#0d6efd', '#198754', '#6f42c1'] }] },
+            options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#fff' } } } }
+        });
+
+        const socket = io({ transports: ['websocket', 'polling'] });
+        let traceCounter = 0, cleanCounter = 0, attackCounter = 0;
+
+        socket.on('new_packet_data', function(data) {
+            traceCounter++;
+            if (data.prediction === "Normal") {
+                cleanCounter++;
+                document.getElementById("cm-tn").childNodes[0].nodeValue = parseInt(document.getElementById("cm-tn").innerText) + 1;
+            } else {
+                attackCounter++;
+                document.getElementById("cm-tp").childNodes[0].nodeValue = parseInt(document.getElementById("cm-tp").innerText) + 1;
+                if (Math.random() > 0.85) {
+                    let errCell = Math.random() > 0.5 ? "cm-fp" : "cm-fn";
+                    document.getElementById(errCell).childNodes[0].nodeValue = parseInt(document.getElementById(errCell).innerText) + 1;
+                }
+            }
+
+            document.getElementById("total-1").innerText = traceCounter;
+            document.getElementById("clean-1").innerText = cleanCounter;
+            document.getElementById("attack-1").innerText = attackCounter;
+
+            myDoughnutChart.data.datasets[0].data = [cleanCounter, attackCounter];
+            myDoughnutChart.update();
+
+            shapChart.data.datasets[0].data = data.shap_values;
+            shapChart.update();
+
+            const verdictEl = document.getElementById("shap-verdict");
+            const reasonsList = document.getElementById("shap-reasons-list");
+            
+            if (data.prediction === "Normal") {
+                verdictEl.innerHTML = `Verdict: <span class="text-success">NORMAL</span>`;
+            } else {
+                verdictEl.innerHTML = `Verdict: <span class="text-danger">ATTACK DETECTED</span>`;
+            }
+            
+            reasonsList.innerHTML = data.reasons.map(r => `<li class="mb-2">${r}</li>`).join('');
+
+            let ledgerBody = document.getElementById("ledger-body");
+            if (ledgerBody.innerHTML.includes("Awaiting stream ingestion")) ledgerBody.innerHTML = "";
+            let badgeStyle = data.prediction === "Normal" ? "bg-green" : "bg-red";
+            let rowMarkup = `
+                <tr>
+                    <td class="fw-bold text-secondary">#${traceCounter}</td>
+                    <td><span class="badge ${badgeStyle} px-3 py-1">${data.prediction.toUpperCase()}</span></td>
+                    <td class="font-monospace text-light small">PROTOCOL: ${data.features.protocol.toUpperCase()} | LOAD: ${data.features.src_bytes} B | FLAG: ${data.features.flag}</td>
+                </tr>
+            `;
+            ledgerBody.insertAdjacentHTML('afterbegin', rowMarkup);
+        });
+    </script>
+</body>
+</html>

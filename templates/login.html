@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>IDS Access gateway</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
+    <style>
+        body { background-color: #121212; color: white; display: flex; align-items: center; justify-content: center; height: 100vh; }
+        .login-card { background: #1e1e1e; border: 1px solid #2d2d2d; border-radius: 10px; padding: 40px; width: 100%; max-width: 420px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <h3 class="text-center text-primary fw-bold mb-4">🛡️ IDS Access gateway</h3>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, msg in messages %}
+              <div class="alert alert-{{ category }} text-center py-2 small">{{ msg }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+        <form method="POST" action="/login">
+            <div class="mb-3">
+                <label class="form-label text-muted">User Handle</label>
+                <input type="text" name="username" class="form-control bg-dark text-white border-secondary" placeholder="admin" required autocomplete="off">
+            </div>
+            <div class="mb-4">
+                <label class="form-label text-muted">Secure Access Key</label>
+                <input type="password" name="password" class="form-control bg-dark text-white border-secondary" placeholder="password123" required>
+            </div>
+            <button type="submit" class="btn btn-primary w-100 fw-bold py-2">Authenticate Workspace</button>
+        </form>
+    </div>
+</body>
+</html>
